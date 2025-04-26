@@ -1,0 +1,317 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multtipen Function Test Dashboard - Dose & Injection</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --primary: #07378A;
+            --secondary: #7d9fb5;
+            --accent: #e37222;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 0;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            margin: 0;
+            font-weight: 300;
+            font-size: 1.6rem;
+        }
+        .compliance-badge {
+            background-color: var(--success);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+        .dashboard-section {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            padding: 10px;
+        }
+        .section-title {
+            color: var(--primary);
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 6px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        .chart-container {
+            width: 100%;
+            height: 200px;
+        }
+        .horizontal-layout {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .chart-section {
+            flex: 1;
+            max-width: 350px;
+        }
+        .spec-limits {
+            background-color: #f8f9fa;
+            padding: 8px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
+            font-size: 0.6rem;
+            margin-top: 5px;
+        }
+        .spec-title {
+            font-weight: bold;
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 0.8rem;
+        }
+        footer {
+            text-align: center;
+            padding: 10px;
+            color: var(--dark);
+            font-size: 0.7rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <h1>Multtipen Function Test Dashboard</h1>
+            <div>
+                <span class="compliance-badge">ISO11608 Compliant</span>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <section class="dashboard-section">
+            <div class="horizontal-layout">
+                <div class="chart-section">
+                    <h2 class="section-title">Dose Accuracy - 0.25mg</h2>
+                    <div id="doseChart025" class="chart-container"></div>
+                    <div class="spec-limits">
+                        <h3 class="spec-title">Specifications</h3>
+                        <p>0.37g ±5% (0.3515g - 0.3885g)</p>
+                    </div>
+                </div>
+                <div class="chart-section">
+                    <h2 class="section-title">Dose Accuracy - 0.5mg</h2>
+                    <div id="doseChart05" class="chart-container"></div>
+                    <div class="spec-limits">
+                        <h3 class="spec-title">Specifications</h3>
+                        <p>0.74g ±5% (0.703g - 0.777g)</p>
+                    </div>
+                </div>
+                <div class="chart-section">
+                    <h2 class="section-title">Injection Force</h2>
+                    <div id="injectionChart" class="chart-container"></div>
+                    <div class="spec-limits">
+                        <h3 class="spec-title">Specifications</h3>
+                        <p>Target Range: 5-7N</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <p>© 2025 Summed Medtech</p>
+        </div>
+    </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Dose Chart 0.25mg
+            var doseData025 = [];
+            var testNumbers = Array.from({length: 30}, (_, i) => i + 1);
+            for (let i = 0; i < 4; i++) {
+                doseData025.push({
+                    x: testNumbers,
+                    y: [
+                        0.3725, 0.3786, 0.3689, 0.3666, 0.3812, 0.3839, 0.3812, 0.3778, 0.3803, 0.381,
+                        0.3789, 0.3803, 0.3654, 0.3688, 0.3807, 0.3786, 0.3767, 0.3721, 0.3846, 0.3808,
+                        0.3782, 0.3809, 0.3834, 0.3799, 0.384, 0.3796, 0.3847, 0.3769, 0.3712, 0.3771
+                    ],
+                    name: `Test ${i+1}`,
+                    type: 'scatter',
+                    mode: 'markers',
+                    marker: { color: '#07378A', size: 4 }
+                });
+            }
+            doseData025.push({
+                x: [0, 31],
+                y: [0.3885, 0.3885],
+                name: 'Upper Limit',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'red', dash: 'dash', width: 1 }
+            });
+            doseData025.push({
+                x: [0, 31],
+                y: [0.3515, 0.3515],
+                name: 'Lower Limit',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'red', dash: 'dash', width: 1 }
+            });
+            doseData025.push({
+                x: [0, 31],
+                y: [0.37, 0.37],
+                name: 'Target',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'green', width: 1 }
+            });
+            var doseLayout025 = {
+                title: '',
+                xaxis: { title: 'Sample Number', range: [0, 31], tickfont: { size: 8 } },
+                yaxis: { title: 'Dose Weight (g)', range: [0.34, 0.40], tickfont: { size: 8 } },
+                showlegend: true,
+                legend: { orientation: 'h', y: -0.3, font: { size: 8 } },
+                margin: { t: 20, b: 60, l: 40, r: 20 }
+            };
+            Plotly.newPlot('doseChart025', doseData025, doseLayout025);
+
+            // Dose Chart 0.5mg
+            var doseData05 = [];
+            var testNumbers05 = Array.from({length: 15}, (_, i) => i + 1);
+            for (let i = 0; i < 2; i++) {
+                doseData05.push({
+                    x: testNumbers05,
+                    y: [
+                        0.7604, 0.7575, 0.751, 0.7591, 0.7516, 0.7416, 0.7526, 0.7463, 0.7518, 0.7546,
+                        0.7453, 0.7531, 0.7431, 0.7422, 0.7275
+                    ],
+                    name: `Test ${i+1}`,
+                    type: 'scatter',
+                    mode: 'markers',
+                    marker: { color: '#07378A', size: 4 }
+                });
+            }
+            doseData05.push({
+                x: [0, 16],
+                y: [0.777, 0.777],
+                name: 'Upper Limit',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'red', dash: 'dash', width: 1 }
+            });
+            doseData05.push({
+                x: [0, 16],
+                y: [0.703, 0.703],
+                name: 'Lower Limit',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'red', dash: 'dash', width: 1 }
+            });
+            doseData05.push({
+                x: [0, 16],
+                y: [0.74, 0.74],
+                name: 'Target',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: 'green', width: 1 }
+            });
+            var doseLayout05 = {
+                title: '',
+                xaxis: { title: 'Sample Number', range: [0, 16], tickfont: { size: 8 } },
+                yaxis: { title: 'Dose Weight (g)', range: [0.69, 0.80], tickfont: { size: 8 } },
+                showlegend: true,
+                legend: { orientation: 'h', y: -0.3, font: { size: 8 } },
+                margin: { t: 20, b: 60, l: 40, r: 20 }
+            };
+            Plotly.newPlot('doseChart05', doseData05, doseLayout05);
+
+            // Injection Force Chart
+            var injectionData = [
+                {
+                    y: [6.04, 6, 6.01, 5.63, 5.43, 6.13, 6.06, 5.67, 5.9, 5.59, 5.76, 5.87, 6.21, 6.65, 6.22, 5.54, 6.24, 5.95, 6.21, 6.29, 5.81, 6.33, 5.87, 6.02, 5.94, 6.13, 5.64, 6.39, 6.01, 6.08],
+                    name: 'Injection Force (N)',
+                    type: 'box',
+                    boxpoints: 'all',
+                    jitter: 0.3,
+                    pointpos: -1.8,
+                    marker: { color: '#07378A', size: 4 },
+                    boxmean: true,
+                    whiskerwidth: 0.5
+                }
+            ];
+            var injectionLayout = {
+                title: '',
+                yaxis: { title: 'Force (N)', range: [5, 7], tickfont: { size: 8 } },
+                showlegend: false,
+                margin: { t: 20, b: 60, l: 40, r: 20 }
+            };
+            Plotly.newPlot('injectionChart', injectionData, injectionLayout);
+        });
+    </script>
+</body>
+</html>

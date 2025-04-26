@@ -1,0 +1,368 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multtipen Function Test Dashboard - Cap & Torque</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --primary: #07378A;
+            --secondary: #7d9fb5;
+            --accent: #e37222;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 0;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            margin: 0;
+            font-weight: 300;
+            font-size: 1.6rem;
+        }
+        .compliance-badge {
+            background-color: var(--success);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+        .dashboard-section {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            padding: 10px;
+        }
+        .section-title {
+            color: var(--primary);
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 6px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        .chart-container {
+            width: 100%;
+            height: 200px;
+        }
+        .horizontal-layout {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .chart-section {
+            flex: 1;
+            max-width: 550px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.6rem;
+            margin-top: 5px;
+        }
+        .data-table th, .data-table td {
+            padding: 6px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .data-table th {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 500;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .data-table tr:hover {
+            background-color: #f1f1f1;
+        }
+        .status-ok {
+            color: var(--success);
+            font-weight: bold;
+        }
+        .spec-limits {
+            background-color: #f8f9fa;
+            padding: 8px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
+            font-size: 0.6rem;
+            margin-top: 5px;
+        }
+        .spec-title {
+            font-weight: bold;
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 0.8rem;
+        }
+        footer {
+            text-align: center;
+            padding: 10px;
+            color: var(--dark);
+            font-size: 0.7rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <h1>Multtipen Function Test Dashboard</h1>
+            <div>
+                <span class="compliance-badge">ISO11608 Compliant</span>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <section class="dashboard-section">
+            <div class="horizontal-layout">
+                <div class="chart-section">
+                    <h2 class="section-title">Cap Removal & Close Force</h2>
+                    <div id="capForceChart" class="chart-container"></div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Cap Removal Force (N)</th>
+                                <th>Cap Close Force (N)</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>8.8</td>
+                                <td>7.43</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>11.37</td>
+                                <td>9.35</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>9.84</td>
+                                <td>6.85</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>10.74</td>
+                                <td>7.32</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>12.07</td>
+                                <td>8.73</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="spec-limits">
+                        <h3 class="spec-title">Specifications</h3>
+                        <p><strong>Cap Removal Force:</strong> Target range 8-12N</p>
+                        <p><strong>Cap Close Force:</strong> Target range 6-10N</p>
+                    </div>
+                </div>
+                <div class="chart-section">
+                    <h2 class="section-title">Bidirectional Rotation Torque</h2>
+                    <div id="torqueChart" class="chart-container"></div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Forward Torque (N.mm)</th>
+                                <th>Reverse Torque (N.mm)</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>59.2</td>
+                                <td>34.2</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>90.1</td>
+                                <td>61.6</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>67.8</td>
+                                <td>55.7</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>60.8</td>
+                                <td>29.8</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>60.0</td>
+                                <td>29.8</td>
+                                <td class="status-ok">OK</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="spec-limits">
+                        <h3 class="spec-title">Specifications</h3>
+                        <p><strong>Forward Rotation Torque:</strong> Target range 50-80N.mm</p>
+                        <p><strong>Reverse Rotation Torque:</strong> Target range 20-60N.mm</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <p>© 2025 Summed Medtech</p>
+        </div>
+    </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cap Force Chart
+            var capForceData = [
+                {
+                    y: [8.8, 11.37, 9.84, 10.74, 12.07, 10.37, 10.73, 12.91, 12.67, 13.22, 13.47, 13.58, 11.75, 8.86, 11.19, 9.77, 10.6, 10.03, 11.43, 9.92, 10.15, 7.41, 10.17, 11.78, 12.11, 6.89, 11.29, 8.76, 11.21, 10.56],
+                    name: 'Cap Removal Force (N)',
+                    type: 'box',
+                    boxpoints: 'all',
+                    jitter: 0.3,
+                    pointpos: -1.8,
+                    marker: { color: '#07378A', size: 4 },
+                    boxmean: true,
+                    whiskerwidth: 0.5
+                },
+                {
+                    y: [7.43, 9.35, 6.85, 7.32, 8.73, 8.28, 11.42, 7.81, 7.37, 8.45, 10.29, 8.37, 9.59, 7.37, 9.24, 7.03, 8.21, 8.63, 7.98, 8.13, 7.07, 6.62, 6.37, 10.01, 9.45, 5.1, 6.69, 5.89, 7.69, 8.25],
+                    name: 'Cap Close Force (N)',
+                    type: 'box',
+                    boxpoints: 'all',
+                    jitter: 0.3,
+                    pointpos: -1.8,
+                    marker: { color: '#e37222', size: 4 },
+                    boxmean: true,
+                    whiskerwidth: 0.5
+                }
+            ];
+            var capForceLayout = {
+                title: '',
+                yaxis: { title: 'Force (N)', range: [4, 15], tickfont: { size: 8 } },
+                boxmode: 'group',
+                showlegend: true,
+                legend: { orientation: 'h', y: -0.3, font: { size: 8 } },
+                margin: { t: 20, b: 60, l: 40, r: 20 }
+            };
+            Plotly.newPlot('capForceChart', capForceData, capForceLayout);
+
+            // Torque Chart
+            var torqueData = [
+                {
+                    y: [59.2, 90.1, 67.8, 60.8, 60, 61.8, 72.9, 54.8, 75, 60.2, 75.7, 63.7, 57.2, 54, 60.7, 61.9, 68.4, 78.7, 74.8, 72.9, 64.2, 60.6, 58.1, 59.6, 70.6, 60.6, 58.5, 73.6, 66.4, 65.89],
+                    name: 'Forward Torque (N.mm)',
+                    type: 'box',
+                    boxpoints: 'all',
+                    jitter: 0.3,
+                    pointpos: -1.8,
+                    marker: { color: '#07378A', size: 4 },
+                    boxmean: true,
+                    whiskerwidth: 0.5
+                },
+                {
+                    y: [34.2, 61.6, 55.7, 29.8, 29.8, 52.9, 59.7, 22.1, 24.1, 24.6, 80.4, 50.8, 35.3, 21.5, 24.8, 22.2, 56.1, 43.4, 46.1, 47.8, 51.3, 22.2, 24, 49.4, 76.2, 24.3, 22, 34.6, 24, 38.8],
+                    name: 'Reverse Torque (N.mm)',
+                    type: 'box',
+                    boxpoints: 'all',
+                    jitter: 0.3,
+                    pointpos: -1.8,
+                    marker: { color: '#e37222', size: 4 },
+                    boxmean: true,
+                    whiskerwidth: 0.5
+                }
+            ];
+            var torqueLayout = {
+                title: '',
+                yaxis: { title: 'Torque (N.mm)', range: [20, 100], tickfont: { size: 8 } },
+                boxmode: 'group',
+                showlegend: true,
+                legend: { orientation: 'h', y: -0.3, font: { size: 8 } },
+                margin: { t: 20, b: 60, l: 40, r: 20 }
+            };
+            Plotly.newPlot('torqueChart', torqueData, torqueLayout);
+        });
+    </script>
+</body>
+</html>

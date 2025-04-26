@@ -1,0 +1,352 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multtipen Function Test Dashboard - Summary</title>
+    <style>
+        :root {
+            --primary: #07378A;
+            --secondary: #7d9fb5;
+            --accent: #e37222;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 0;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            margin: 0;
+            font-weight: 300;
+            font-size: 1.6rem;
+        }
+        .compliance-badge {
+            background-color: var(--success);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+        .dashboard-section {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+            padding: 10px;
+        }
+        .section-title {
+            color: var(--primary);
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 6px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .metric-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            padding: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        .metric-title {
+            color: var(--primary);
+            margin-top: 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .metric-values {
+            display: flex;
+            justify-content: space-between;
+        }
+        .metric-value {
+            text-align: center;
+        }
+        .value-label {
+            font-size: 0.6rem;
+            color: var(--dark);
+            margin-bottom: 3px;
+        }
+        .value-number {
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .min-value { color: var(--accent); }
+        .max-value { color: var(--danger); }
+        .mean-value { color: var(--success); }
+        .spec-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.7rem;
+        }
+        .spec-table th, .spec-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .spec-table th {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 500;
+        }
+        footer {
+            text-align: center;
+            padding: 10px;
+            color: var(--dark);
+            font-size: 0.7rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <h1>Multtipen Function Test Dashboard</h1>
+            <div>
+                <span class="compliance-badge">ISO11608 Compliant</span>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <section class="dashboard-section">
+            <h2 class="section-title">Test Summary</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3 class="metric-title">0.25mg Dose (g)</h3>
+                    <div class="metric-values">
+                        <div class="metric-value">
+                            <div class="value-label">Minimum</div>
+                            <div class="value-number min-value">0.3528</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Maximum</div>
+                            <div class="value-number max-value">0.3847</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Mean</div>
+                            <div class="value-number mean-value">0.3742</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3 class="metric-title">0.5mg Dose (g)</h3>
+                    <div class="metric-values">
+                        <div class="metric-value">
+                            <div class="value-label">Minimum</div>
+                            <div class="value-number min-value">-</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Maximum</div>
+                            <div class="value-number max-value">-</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Mean</div>
+                            <div class="value-number mean-value">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3 class="metric-title">Injection Force (N)</h3>
+                    <div class="metric-values">
+                        <div class="metric-value">
+                            <div class="value-label">Minimum</div>
+                            <div class="value-number min-value">5.43</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Maximum</div>
+                            <div class="value-number max-value">6.65</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Mean</div>
+                            <div class="value-number mean-value">6.01</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3 class="metric-title">Cap Removal Force (N)</h3>
+                    <div class="metric-values">
+                        <div class="metric-value">
+                            <div class="value-label">Minimum</div>
+                            <div class="value-number min-value">6.89</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Maximum</div>
+                            <div class="value-number max-value">13.58</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Mean</div>
+                            <div class="value-number mean-value">10.72</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3 class="metric-title">Cap Close Force (N)</h3>
+                    <div class="metric-values">
+                        <div class="metric-value">
+                            <div class="value-label">Minimum</div>
+                            <div class="value-number min-value">5.10</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Maximum</div>
+                            <div class="value-number max-value">11.42</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Mean</div>
+                            <div class="value-number mean-value">7.94</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3 class="metric-title">Forward Torque (N.mm)</h3>
+                    <div class="metric-values">
+                        <div class="metric-value">
+                            <div class="value-label">Minimum</div>
+                            <div class="value-number min-value">54.0</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Maximum</div>
+                            <div class="value-number max-value">90.1</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Mean</div>
+                            <div class="value-number mean-value">64.7</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3 class="metric-title">Reverse Torque (N.mm)</h3>
+                    <div class="metric-values">
+                        <div class="metric-value">
+                            <div class="value-label">Minimum</div>
+                            <div class="value-number min-value">21.5</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Maximum</div>
+                            <div class="value-number max-value">80.4</div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="value-label">Mean</div>
+                            <div class="value-number mean-value">40.2</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <table class="spec-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Specification</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>0.25mg Dose</td>
+                        <td>0.37g ±5% (0.3515g - 0.3885g)</td>
+                    </tr>
+                    <tr>
+                        <td>0.5mg Dose</td>
+                        <td>0.74g ±5% (0.703g - 0.777g)</td>
+                    </tr>
+                    <tr>
+                        <td>Injection Force</td>
+                        <td>Target range: 5-7N</td>
+                    </tr>
+                    <tr>
+                        <td>Cap Removal Force</td>
+                        <td>Target range: 8-12N</td>
+                    </tr>
+                    <tr>
+                        <td>Cap Close Force</td>
+                        <td>Target range: 6-10N</td>
+                    </tr>
+                    <tr>
+                        <td>Forward Rotation Torque</td>
+                        <td>Target range: 50-80N.mm</td>
+                    </tr>
+                    <tr>
+                        <td>Reverse Rotation Torque</td>
+                        <td>Target range: 20-60N.mm</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <p>© 2025 Summed Medtech</p>
+        </div>
+    </footer>
+</body>
+</html>
